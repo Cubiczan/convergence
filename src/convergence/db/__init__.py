@@ -1,4 +1,4 @@
-"""SQLite-backed persistence for decisions, workstreams, and control tower state."""
+"""SQLite-backed persistence for decisions, workstreams, and Convergence state."""
 from __future__ import annotations
 
 import json
@@ -13,7 +13,7 @@ from convergence.chp.models import DecisionCase
 class ConvergenceDB:
     """SQLite database for Convergence persistence.
 
-    Stores decision cases, workstream state, and control tower snapshots.
+    Stores decision cases, workstream state, and Convergence snapshots.
     Runs without any external database server — perfect for DO App Platform
     local storage. Upgrade to Managed PostgreSQL for production via the
     convergence[postgres] extra.
@@ -38,7 +38,7 @@ class ConvergenceDB:
         created_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS control_tower_snapshots (
+    CREATE TABLE IF NOT EXISTS convergence_snapshots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         snapshot_json TEXT NOT NULL,
         created_at TEXT NOT NULL
@@ -100,9 +100,9 @@ class ConvergenceDB:
         self._conn.commit()
         return cursor.lastrowid
 
-    def save_control_tower_snapshot(self, snapshot: Dict[str, Any]) -> int:
+    def save_convergence_snapshot(self, snapshot: Dict[str, Any]) -> int:
         cursor = self._conn.execute(
-            "INSERT INTO control_tower_snapshots (snapshot_json, created_at) VALUES (?, ?)",
+            "INSERT INTO convergence_snapshots (snapshot_json, created_at) VALUES (?, ?)",
             (json.dumps(snapshot), time.strftime("%Y-%m-%dT%H:%M:%SZ")),
         )
         self._conn.commit()

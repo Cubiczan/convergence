@@ -1,4 +1,4 @@
-"""Control Tower — integration health scoring and steering intelligence."""
+"""Convergence — integration health scoring and steering intelligence."""
 from __future__ import annotations
 
 import time
@@ -84,8 +84,8 @@ def compute_completion_pct(workstream_statuses: List[WorkstreamStatus]) -> int:
     return sum(ws.completion_pct for ws in workstream_statuses) // len(workstream_statuses)
 
 
-class ControlTower:
-    """Integration control tower — health, risks, milestones, blocked decisions."""
+class ConvergenceTower:
+    """Convergence — health, risks, milestones, blocked decisions."""
 
     def __init__(self, *, acquirer: str = "", target: str = "",
                  day_post_close: int = 0) -> None:

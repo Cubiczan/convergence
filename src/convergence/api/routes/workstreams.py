@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from convergence.chp.orchestrator import CHPOrchestrator
 from convergence.chp.registry import DecisionRegistry
 from convergence.chp.models import DecisionCase, Dossier, FoundationAttack, FoundationDisclosure, SessionStatus, WorkstreamType
-from convergence.control_tower import BlockedDecision, ControlTower, Milestone, RiskItem, WorkstreamStatus
+from convergence.convergence_tower import BlockedDecision, ConvergenceTower, Milestone, RiskItem, WorkstreamStatus
 from convergence.mesh.orchestrator import EnterpriseOrchestrator
 from convergence.workstreams import WORKSTREAM_MAP, WorkstreamBrief
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/v1", tags=["workstreams"])
 
 # In-memory state (production would use DB)
 _registry = DecisionRegistry()
-_tower = ControlTower()
+_tower = ConvergenceTower()
 _orchestrator = CHPOrchestrator(registry=_registry)
 
 
@@ -56,15 +56,15 @@ def analyze_workstream(workstream_type: str) -> Dict[str, Any]:
             "workflow_steps": len(report.workflow.steps)}
 
 
-@router.get("/control-tower")
-def get_control_tower() -> Dict[str, Any]:
+@router.get("/convergence")
+def get_convergence() -> Dict[str, Any]:
     return _tower.to_dict()
 
 
-@router.post("/control-tower/init")
-def init_control_tower(acquirer: str = "", target: str = "", day_post_close: int = 0) -> Dict[str, Any]:
+@router.post("/convergence/init")
+def init_convergence(acquirer: str = "", target: str = "", day_post_close: int = 0) -> Dict[str, Any]:
     global _tower
-    _tower = ControlTower(acquirer=acquirer, target=target, day_post_close=day_post_close)
+    _tower = ConvergenceTower(acquirer=acquirer, target=target, day_post_close=day_post_close)
     # Initialize default workstream statuses
     for ws_type in WORKSTREAM_MAP:
         cls = WORKSTREAM_MAP[ws_type]
@@ -75,7 +75,7 @@ def init_control_tower(acquirer: str = "", target: str = "", day_post_close: int
     return _tower.to_dict()
 
 
-@router.post("/control-tower/risks")
+@router.post("/convergence/risks")
 def add_risk(risk: Dict[str, Any]) -> Dict[str, Any]:
     item = RiskItem(id=risk.get("id", ""), title=risk.get("title", ""),
                     category=risk.get("category", ""), severity=risk.get("severity", "medium"),
@@ -85,7 +85,7 @@ def add_risk(risk: Dict[str, Any]) -> Dict[str, Any]:
     return {"added": True, "risk": item.to_dict()}
 
 
-@router.post("/control-tower/milestones")
+@router.post("/convergence/milestones")
 def add_milestone(milestone: Dict[str, Any]) -> Dict[str, Any]:
     item = Milestone(id=milestone.get("id", ""), title=milestone.get("title", ""),
                      target_date=milestone.get("target_date", ""),
@@ -95,7 +95,7 @@ def add_milestone(milestone: Dict[str, Any]) -> Dict[str, Any]:
     return {"added": True, "milestone": item.to_dict()}
 
 
-@router.post("/control-tower/blocked-decisions")
+@router.post("/convergence/blocked-decisions")
 def add_blocked_decision(decision: Dict[str, Any]) -> Dict[str, Any]:
     item = BlockedDecision(id=decision.get("id", ""), title=decision.get("title", ""),
                           blocking_reason=decision.get("blocking_reason", ""),

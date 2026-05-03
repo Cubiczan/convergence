@@ -10,7 +10,7 @@ from convergence.api.routes.workstreams import router as workstreams_router
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Convergence",
-        description="Post-Merger Integration Intelligence Platform - CHP-governed multi-agent control tower",
+        description="Post-Merger Integration Intelligence Platform - CHP-governed multi-agent Convergence",
         version="0.1.0",
     )
     app.add_middleware(

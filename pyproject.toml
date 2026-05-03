@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "convergence"
 version = "0.1.0"
-description = "Post-Merger Integration Intelligence Platform — CHP-governed multi-agent control tower for M&A finance integration"
+description = "Post-Merger Integration Intelligence Platform — CHP-governed multi-agent Convergence for M&A finance integration"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11"

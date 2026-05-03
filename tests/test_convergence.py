@@ -1,4 +1,4 @@
-"""Tests for Convergence — CHP, Mesh, Workstreams, Control Tower, API."""
+"""Tests for Convergence — CHP, Mesh, Workstreams, Convergence Tower, API."""
 import json
 import os
 import sys
@@ -42,8 +42,8 @@ from convergence.workstreams.coa_mapping import CoAMappingWorkstream
 from convergence.workstreams.close_harmonization import CloseHarmonizationWorkstream
 from convergence.workstreams.systems_integration import SystemsIntegrationWorkstream
 from convergence.workstreams.synergy_tracking import SynergyTrackingWorkstream
-from convergence.control_tower import (
-    ControlTower, RiskItem, Milestone, BlockedDecision,
+from convergence.convergence_tower import (
+    ConvergenceTower, RiskItem, Milestone, BlockedDecision,
     compute_overall_health, compute_completion_pct,
 )
 
@@ -904,50 +904,50 @@ class TestSynergyTracking(unittest.TestCase):
 # CONTROL TOWER TESTS (146-155)
 # ============================================================
 
-class TestControlTower(unittest.TestCase):
+class TestConvergenceTower(unittest.TestCase):
     def test_empty_tower(self):
-        tower = ControlTower()
+        tower = ConvergenceTower()
         self.assertEqual(tower.overall_health, IntegrationHealth.NOT_STARTED)
         self.assertEqual(tower.completion_pct, 0)
 
     def test_all_green(self):
-        tower = ControlTower()
+        tower = ConvergenceTower()
         tower.add_workstream(WorkstreamStatus("ws1", health="green", completion_pct=80))
         tower.add_workstream(WorkstreamStatus("ws2", health="green", completion_pct=90))
         self.assertEqual(tower.overall_health, IntegrationHealth.GREEN)
 
     def test_one_amber(self):
-        tower = ControlTower()
+        tower = ConvergenceTower()
         tower.add_workstream(WorkstreamStatus("ws1", health="green", completion_pct=80))
         tower.add_workstream(WorkstreamStatus("ws2", health="amber", completion_pct=50))
         self.assertEqual(tower.overall_health, IntegrationHealth.AMBER)
 
     def test_one_red(self):
-        tower = ControlTower()
+        tower = ConvergenceTower()
         tower.add_workstream(WorkstreamStatus("ws1", health="green", completion_pct=80))
         tower.add_workstream(WorkstreamStatus("ws2", health="red", completion_pct=10))
         self.assertEqual(tower.overall_health, IntegrationHealth.RED)
 
     def test_risk_management(self):
-        tower = ControlTower()
+        tower = ConvergenceTower()
         tower.add_risk(RiskItem(id="r1", title="ERP migration risk", category="systems", severity="critical"))
         tower.add_risk(RiskItem(id="r2", title="Minor delay", category="close", severity="low"))
         self.assertEqual(len(tower.critical_risks), 1)
 
     def test_blocked_decisions(self):
-        tower = ControlTower()
+        tower = ConvergenceTower()
         tower.add_blocked_decision(BlockedDecision(id="bd1", title="Sandbox decision",
                                                     blocking_reason="4/29 steering pending"))
         self.assertEqual(len(tower.blocked_decisions), 1)
 
     def test_milestones(self):
-        tower = ControlTower()
+        tower = ConvergenceTower()
         tower.add_milestone(Milestone(id="m1", title="First combined close", target_date="2026-10-31"))
         tower.add_milestone(Milestone(id="m2", title="NetSuite cutover", target_date="2026-10-31", status="complete"))
         self.assertEqual(len(tower.open_milestones), 1)
 
     def test_serialization(self):
-        tower = ControlTower(acquirer="Acme", target="Summit", day_post_close=53)
+        tower = ConvergenceTower(acquirer="Acme", target="Summit", day_post_close=53)
         tower.add_workstream(WorkstreamStatus("coa_mapping", health="green"))
         tower.add_risk(RiskItem(id="r1", title="Test risk", category="test", severity="high"))
         data = tower.to_dict()

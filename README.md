@@ -1,8 +1,34 @@
 # Convergence
 
-**Post-Merger Integration Intelligence Platform** — CHP-governed multi-agent control tower for M&A finance integration.
+**Post-Merger Integration Intelligence Platform** — CHP-governed multi-agent Convergence for M&A finance integration.
 
 Built on DigitalOcean: App Platform + Managed PostgreSQL + Spaces.
+
+## Dashboard Demo
+
+https://github.com/user-attachments/assets/convergence-dashboard-demo.mp4
+
+### Screenshots
+
+**Overview** — Real-time integration health, workstream status, KPIs, and milestone tracking at a glance.
+
+![Convergence Overview](dashboard/screenshots/01-overview.png)
+
+**Workstreams** — Deep-dive into each of the 4 integration workstreams with multi-agent team details, key metrics, and recent activity.
+
+![Workstreams](dashboard/screenshots/02-workstreams.png)
+
+**CHP Decision Pipeline** — Consensus Hardening Protocol view showing every integration decision through adversarial multi-agent validation from EXPLORING to LOCKED.
+
+![CHP Decisions](dashboard/screenshots/03-chp-decisions.png)
+
+**Risk Registry** — Integration risk items with severity classification, owner tracking, impact assessment, and mitigation tracking.
+
+![Risk Registry](dashboard/screenshots/04-risks.png)
+
+**Synergy Pipeline** — Cost, revenue, and capital synergy tracking with probability-weighted expected value and capture status.
+
+![Synergy Pipeline](dashboard/screenshots/05-synergies.png)
 
 ## Architecture
 
@@ -16,7 +42,7 @@ Cognitive Mesh Protocol (expansion/compression reasoning)
 Consensus Hardening Protocol (EXPLORING -> PROVISIONAL_LOCK -> LOCKED)
     |
     v
-Control Tower Dashboard (health, risks, milestones, decisions)
+Convergence Dashboard (health, risks, milestones, decisions)
 ```
 
 ### 4 Integration Workstreams
@@ -33,7 +59,7 @@ Control Tower Dashboard (health, risks, milestones, decisions)
 | Component | Service | Purpose |
 |---|---|---|
 | API Backend | App Platform (Python/uvicorn) | FastAPI + CHP + Mesh engines |
-| Dashboard | App Platform (Next.js) | Control Tower UI |
+| Dashboard | App Platform (Next.js) | Convergence UI |
 | Database | Managed PostgreSQL 16 | Decisions, mappings, audit trail |
 | Storage | Spaces (S3) | Artifacts, CSVs, board decks |
 | Inference | GenAI Inference | GPT-oss-20b / Llama 3.3 70B |
@@ -83,8 +109,8 @@ MODEL_ACCESS_KEY=doo_v1_... uvicorn convergence.api.main:app --reload
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/v1/health` | Health check |
-| GET | `/api/v1/control-tower` | Integration health dashboard data |
-| POST | `/api/v1/control-tower/init` | Initialize control tower for a deal |
+| GET | `/api/v1/convergence` | Integration health dashboard data |
+| POST | `/api/v1/convergence/init` | Initialize Convergence for a deal |
 | GET | `/api/v1/workstreams` | List all workstreams |
 | POST | `/api/v1/workstreams/{type}/analyze` | Run multi-agent analysis |
 | GET | `/api/v1/decisions` | List all CHP decisions |
@@ -102,15 +128,18 @@ terraform apply -var="do_token=$DIGITALOCEAN_API_TOKEN" -var="environment=prod"
 
 ```
 src/convergence/
-  chp/            # Consensus Hardening Protocol (gates, payloads, lock)
-  mesh/           # Cognitive Mesh (agents, protocol, context, playbook)
-  workstreams/    # 4 M&A integration workstreams
-  control_tower/  # Health scoring, risks, milestones
-  inference/      # DO GenAI client (OpenAI-compatible)
-  db/             # SQLite/PostgreSQL persistence
-  api/            # FastAPI backend
-tests/            # 170+ tests
-terraform/        # DO infrastructure
+  chp/                # Consensus Hardening Protocol (gates, payloads, lock)
+  mesh/               # Cognitive Mesh (agents, protocol, context, playbook)
+  workstreams/        # 4 M&A integration workstreams
+  convergence_tower/  # Health scoring, risks, milestones
+  inference/          # DO GenAI client (OpenAI-compatible)
+  db/                 # SQLite/PostgreSQL persistence
+  api/                # FastAPI backend
+dashboard/            # Next.js Convergence UI
+  screenshots/        # Dashboard screenshots
+  app/                # Next.js pages
+tests/                # 129 tests
+terraform/            # DO infrastructure
 ```
 
 ## License

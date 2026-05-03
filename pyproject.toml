@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "convergence"
+version = "0.1.0"
+description = "Post-Merger Integration Intelligence Platform — CHP-governed multi-agent control tower for M&A finance integration"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.11"
+authors = [{name = "cubiczan"}]
+keywords = ["ma", "integration", "chp", "consensus-hardening", "cfo", "digitalocean", "multi-agent"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Office/Business :: Financial",
+]
+
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "httpx>=0.27.0",
+    "aiosqlite>=0.20.0",
+    "pydantic>=2.0",
+    "python-multipart>=0.0.9",
+]
+
+[project.optional-dependencies]
+postgres = ["asyncpg>=0.29.0", "sqlalchemy[asyncio]>=2.0"]
+spaces = ["boto3>=1.35.0"]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+    "ruff>=0.5.0",
+]
+
+[project.scripts]
+convergence = "convergence.api.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

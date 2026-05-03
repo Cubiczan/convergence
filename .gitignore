@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+convergence.db
+*.db
+.env
+.venv/
+.terraform/
+*.tfstate
+*.tfstate.*
+.DS_Store

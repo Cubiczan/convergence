@@ -14,3 +14,7 @@ convergence.db
 *.tfstate
 *.tfstate.*
 .DS_Store
+
+# CHP session artifacts (local only)
+.chp_registry.json
+.chp/sessions/

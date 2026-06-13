@@ -1,10 +1,22 @@
 """Convergence FastAPI application."""
 from __future__ import annotations
 
+import os
+
+from cubiczan_resilience.fastapi_helpers import cors_allowlist
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from convergence.api.routes.workstreams import router as workstreams_router
+
+
+def _allowed_origins() -> list[str]:
+    """Explicit CORS origin allowlist sourced from the ALLOWED_ORIGINS env var.
+
+    Comma-separated; defaults to localhost dev origins when unset.
+    """
+    raw = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000")
+    return [o.strip() for o in raw.split(",") if o.strip()]
 
 
 def create_app() -> FastAPI:
@@ -15,10 +27,7 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        **cors_allowlist(_allowed_origins()),
     )
     app.include_router(workstreams_router)
     return app

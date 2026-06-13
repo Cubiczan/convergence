@@ -3,8 +3,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, HTTPException
+from cubiczan_resilience.fastapi_helpers import require_auth
+from fastapi import APIRouter, Depends, HTTPException
 
+from convergence.inference import InferenceError
 from convergence.chp.orchestrator import CHPOrchestrator
 from convergence.chp.registry import DecisionRegistry
 from convergence.chp.models import DecisionCase, Dossier, FoundationAttack, FoundationDisclosure, SessionStatus, WorkstreamType
@@ -13,6 +15,10 @@ from convergence.mesh.orchestrator import EnterpriseOrchestrator
 from convergence.workstreams import WORKSTREAM_MAP, WorkstreamBrief
 
 router = APIRouter(prefix="/api/v1", tags=["workstreams"])
+
+# Fail-closed bearer auth for mutating routes; token read from API_TOKEN env at
+# request time. Unset/empty token => 503 (never silently unauthenticated).
+_auth = require_auth()
 
 # In-memory state (production would use DB)
 _registry = DecisionRegistry()
@@ -40,7 +46,7 @@ def get_workstream(workstream_type: str) -> Dict[str, Any]:
 
 
 @router.post("/workstreams/{workstream_type}/analyze")
-def analyze_workstream(workstream_type: str) -> Dict[str, Any]:
+def analyze_workstream(workstream_type: str, _: str = Depends(_auth)) -> Dict[str, Any]:
     if workstream_type not in WORKSTREAM_MAP:
         raise HTTPException(404, f"Unknown workstream: {workstream_type}")
     cls = WORKSTREAM_MAP[workstream_type]
@@ -49,8 +55,12 @@ def analyze_workstream(workstream_type: str) -> Dict[str, Any]:
     ws = cls(brief)
     agents = ws.get_agents()
     mesh = EnterpriseOrchestrator(agents=agents, context=ws.context)
-    report = mesh.orchestrate(f"Analyze integration workstream: {workstream_type}",
-                              workflow_title=f"Analysis: {workstream_type}")
+    try:
+        report = mesh.orchestrate(f"Analyze integration workstream: {workstream_type}",
+                                  workflow_title=f"Analysis: {workstream_type}")
+    except InferenceError as exc:
+        # LLM backend exhausted retries / unreachable: surface as 503.
+        raise HTTPException(503, f"inference backend unavailable: {exc}")
     return {"workstream_type": workstream_type, "report": report.render(),
             "duration_ms": report.duration_ms, "agents": [t.agent for t in report.turns],
             "workflow_steps": len(report.workflow.steps)}
@@ -62,7 +72,8 @@ def get_convergence() -> Dict[str, Any]:
 
 
 @router.post("/convergence/init")
-def init_convergence(acquirer: str = "", target: str = "", day_post_close: int = 0) -> Dict[str, Any]:
+def init_convergence(acquirer: str = "", target: str = "", day_post_close: int = 0,
+                     _: str = Depends(_auth)) -> Dict[str, Any]:
     global _tower
     _tower = ConvergenceTower(acquirer=acquirer, target=target, day_post_close=day_post_close)
     # Initialize default workstream statuses
@@ -124,7 +135,8 @@ def get_decision(decision_id: str) -> Dict[str, Any]:
 
 
 @router.post("/decisions/{decision_id}/validate")
-def validate_decision(decision_id: str, validation: Dict[str, Any]) -> Dict[str, Any]:
+def validate_decision(decision_id: str, validation: Dict[str, Any],
+                      _: str = Depends(_auth)) -> Dict[str, Any]:
     from convergence.chp.models import ThirdPartyValidation, ValidationResult
     try:
         tv = ThirdPartyValidation(

@@ -39,7 +39,7 @@ Integration Mesh (3 agents per workstream)
 | **Systems Integration** | System dependency map, cutover risks | Migration plan | Security review |
 | **Synergy Tracking** | Synergy pipeline, value capture | Risk register | Reporting controls |
 
-###扩展到其他场景
+### Extending to Other Scenarios
 
 The same 3-agent-per-workstream architecture applies to:
 

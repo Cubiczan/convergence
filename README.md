@@ -137,12 +137,114 @@ convergence/
 │   ├── mesh/               # Cognitive Mesh (agents, protocol, context, playbook)
 │   ├── workstreams/        # M&A integration workstreams (reference impl)
 │   ├── convergence_tower/  # Health scoring, risks, milestones
+│   ├── audit/              # Signed, append-only HMAC-SHA256 audit ledger
+│   ├── stigmergy/          # SQLite stigmergy board (decaying signal coordination)
 │   ├── inference/          # DO GenAI client
 │   ├── db/                 # SQLite/PostgreSQL persistence
 │   └── api/                # FastAPI backend
 ├── dashboard/              # Next.js Convergence UI
-├── tests/                  # 129 tests
+├── tests/                  # 152 tests
 └── terraform/              # DO infrastructure
+```
+
+---
+
+## Signed Audit Ledger
+
+Every agent recommendation, board narrative, and stigmergy-board write is
+recorded in a **tamper-evident, append-only JSONL ledger**
+(`.convergence/audit.jsonl` by default), so the post-merger-integration
+reasoning trail is defensible to an audit committee, external auditor, or
+regulator.
+
+**Scheme** (extracted from the signed-ledger family — cleanmandate,
+swarmfi-executor, glacier-edge-arm, compliance-as-code-agent — and strengthened
+with per-record signature chaining):
+
+- One JSON record per line, append-only, never rewritten.
+- Each record is signed as `HMAC-SHA256(key, canonical_json(record) + prev_sig)`,
+  where `canonical_json` is the deterministic (sorted-key) encoding of every
+  field except `sig`, and `prev_sig` is the signature of the previous line — so
+  any edit, deletion, or reordering breaks the chain from the first tampered
+  record onward.
+
+**Record shape:** `{ts, event, actor, inputs, sources, confidence?, rationale?, prev_sig, sig}`
+
+**Key:** read from `AUDIT_LEDGER_KEY` (a test default is used when unset so the
+offline tests run without configuration — set a real secret in production).
+
+```python
+from convergence.audit import AuditLedger
+
+ledger = AuditLedger("audit.jsonl")             # key from AUDIT_LEDGER_KEY
+sig = ledger.append(event="recommendation", actor="finance",
+                    inputs={"problem": "map coa"}, sources=["trial_balance"],
+                    confidence="high", rationale="Map 1:1 where clean")
+intact, first_tampered_index = ledger.verify()  # (True, None) when clean
+```
+
+The ledger is wired into `EnterpriseOrchestrator` by default — every turn and
+the final board narrative are signed automatically.
+
+---
+
+## Stigmergic Coordination
+
+Convergence coordinates ~12 mesh agents (four workstreams × three agents).
+Rather than relaying every agent's full output to the next through the LLM,
+agents can coordinate **stigmergically** — by depositing and reading compact
+typed signals on a shared **SQLite board** whose signals **decay over time**.
+Coordination reads/writes are pure arithmetic + SQL, so peer-to-peer
+coordination costs **zero LLM tokens**.
+
+Pattern adapted from **cubiczan-swarm-pack** (scent-field pheromones) and
+**swarmfi-preps** (persistent SQLite stigmergy board).
+
+**How it works**
+
+- **deposit(region/key, kind, strength):** an agent posts a typed signal —
+  `FINDING`, `RISK_FLAG`, `DEPENDENCY_NOTE`, or `CONFIDENCE`.
+- **time decay:** each signal's live strength is
+  `strength · e^(−λ·elapsed)` with `λ = ln(2) / half_life` (per-type
+  half-lives; risk flags linger longest). Signals also carry a hard TTL.
+- **read_signals(region):** returns live signals for a key/region, strongest
+  (post-decay) first; `context_for(agent)` returns the compact board view that
+  is injected into an agent's context **instead of** peer transcripts.
+- **evaporate() / garbage_collect():** purges signals past TTL or decayed below
+  the GC threshold.
+
+**Non-breaking and topology-preserving.** Stigmergy is opt-in via a feature
+flag; the existing Kahn topological producer→consumer ordering is unchanged. The
+board only changes *how context flows between turns*.
+
+```python
+from convergence.mesh.orchestrator import EnterpriseOrchestrator
+
+# Feature-flagged: agents coordinate via the board, not LLM chatter.
+orch = EnterpriseOrchestrator(agents=ws.agents, context=ws.context,
+                              use_stigmergy=True)
+report = orch.orchestrate("Analyze CoA mapping")   # topo order preserved
+```
+
+Direct board use:
+
+```python
+from convergence.stigmergy import StigmergyBoard, SignalType
+
+board = StigmergyBoard()
+board.deposit(agent="finance", signal_type=SignalType.RISK_FLAG,
+              key="coa", content="intercompany accounts unmapped", strength=1.0)
+signals = board.read(key="coa")            # decayed, strongest first
+board.garbage_collect()                     # evaporate expired signals
+```
+
+---
+
+## Running Tests
+
+```bash
+pip install pytest
+PYTHONPATH=src pytest tests/ -v
 ```
 
 ---

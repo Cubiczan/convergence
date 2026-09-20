@@ -1,6 +1,7 @@
 """High-level CHP orchestration for M&A integration decisions."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
 
@@ -14,13 +15,18 @@ from convergence.chp.models import (
     Phase,
     RoundRecord,
     SessionStatus,
+    ValidationResult,
     Verdict,
 )
 from convergence.chp.parity import assess_model_parity
 from convergence.chp.payloads import build_payload_envelope, extract_payload_id, validate_payload_envelope
 from convergence.chp.registry import DecisionRegistry
 from convergence.chp.validators import apply_third_party_validation
+from convergence.audit.ledger import AuditLedger
 from convergence.mesh.context import ContextEngine
+from convergence.mesh.rubric import RubricClearance, assert_promotable
+
+logger = logging.getLogger("convergence.chp")
 
 
 @dataclass
@@ -81,9 +87,22 @@ class CHPOrchestrator:
         *,
         registry: Optional[DecisionRegistry] = None,
         context: Optional[ContextEngine] = None,
+        ledger: Optional[AuditLedger] = None,
     ) -> None:
         self.registry = registry or DecisionRegistry()
         self.context = context or ContextEngine()
+        # Row 35 enforcement: when a signed ledger is wired, narrative-rubric
+        # verdicts gate lock promotion exactly as the CHP state machine does.
+        # Loud when absent: silently ungoverned production is the failure
+        # mode this default exists to prevent.
+        self.ledger = ledger
+        if ledger is None:
+            logger.warning(
+                "CHPOrchestrator constructed WITHOUT a signed AuditLedger — "
+                "narrative-rubric enforcement is DISABLED for this orchestrator. "
+                "Lock promotion will not be gated by rubric verdicts. Wire a "
+                "ledger to enable enforcement."
+            )
 
     def run_initial_session(
         self,
@@ -164,14 +183,20 @@ class CHPOrchestrator:
         case.status = SessionStatus(snapshot_status)
         return case
 
-    def apply_validation(self, decision_id: str, validation) -> DecisionCase:
+    def apply_validation(self, decision_id: str, validation, *, problem: Optional[str] = None) -> DecisionCase:
         case = self.registry.get(decision_id)
         if not case:
             raise KeyError(f"Unknown decision_id: {decision_id}")
+        if validation.result == ValidationResult.CONFIRM and self.ledger is not None:
+            # Pre-check BEFORE mutation: a CONFIRM here would set LOCKED — refuse
+            # it while a failing narrative-rubric verdict governs the problem, so
+            # LOCKED-with-failing-verdict cannot arise as a state.
+            clearance = assert_promotable(self.ledger.read_all(), problem or case.title)
+            self._warn_on_join_mismatch(case, clearance)
         apply_third_party_validation(case, validation)
         return case
 
-    def advance_to_provisional_lock(self, decision_id: str) -> DecisionCase:
+    def advance_to_provisional_lock(self, decision_id: str, *, problem: Optional[str] = None) -> DecisionCase:
         case = self.registry.get(decision_id)
         if not case:
             raise KeyError(f"Unknown decision_id: {decision_id}")
@@ -179,8 +204,33 @@ class CHPOrchestrator:
             raise ValueError("Cannot advance a halted case")
         if case.status == SessionStatus.REFRAME_REQUIRED:
             raise ValueError("Case requires reframing before advancement")
+        if self.ledger is not None:
+            # The narrative's problem statement is the join key — by
+            # convention, orchestrate() is called with the case title.
+            clearance = assert_promotable(self.ledger.read_all(), problem or case.title)
+            self._warn_on_join_mismatch(case, clearance)
         case.status = SessionStatus.PROVISIONAL_LOCK
         return case
+
+    @staticmethod
+    def _warn_on_join_mismatch(case: DecisionCase, clearance: RubricClearance) -> None:
+        """Audit-risk signal for the string join key.
+
+        Renaming a case title after its narrative was graded (or grading a
+        narrative under a different problem string than the case title)
+        makes promotion find NO matching verdict — the gate silently opens.
+        verdicts_total>0 with no match is exactly that shape, and it gets a
+        loud warning; verdicts_total==0 (genuine CHP-only flow) stays
+        silent. This is an audit signal, not a block.
+        """
+        if clearance.status is None and clearance.verdicts_total > 0:
+            logger.warning(
+                "AUDIT RISK: case %s ('%s') promoted with NO matching narrative_rubric "
+                "verdict, but %d verdict(s) exist for OTHER problem strings. If this "
+                "case title was renamed after grading, its failing verdict no longer "
+                "governs it — check the ledger (or GET /audit) for the orphaned verdict.",
+                case.decision_id, case.title, clearance.verdicts_total,
+            )
 
     def _context_check(self, case: DecisionCase) -> ContextCheck:
         related = []

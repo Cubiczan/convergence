@@ -280,3 +280,17 @@ This repository is hardened with the [Consensus Hardening Protocol (CHP)](https:
 
 ### CHP Version
 cognitive-mesh-orchestrator 0.1.0 | [Protocol Docs](https://codeberg.org/cubiczan/consensus-hardening-protocol)
+
+## Propagation decisions
+
+Decisions from the portfolio propagation matrix (SecOps/Gov wave C), recorded
+per the adopt-or-reverse contract. Revisit triggers are binding.
+
+### Row 35 — rubric chain: REVERSED
+
+the repo emits machine-consumed coordination signals through the stigmergy board and mesh orchestrator (src/convergence/stigmergy/board.py, src/convergence/mesh/orchestrator.py); its deliverables are typed signals with deterministic dispositions, not graded prose — there is no artifact a rubric would score.
+
+**Revisit trigger:** a genuinely subjective quality dimension appears in this
+repo's output that no deterministic gate can decide (e.g. prose quality in
+user-facing deliverables). Then author the rubric against the canonical
+chain shape rather than a local one.

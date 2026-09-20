@@ -14,13 +14,16 @@ from convergence.chp.models import (
     Phase,
     RoundRecord,
     SessionStatus,
+    ValidationResult,
     Verdict,
 )
 from convergence.chp.parity import assess_model_parity
 from convergence.chp.payloads import build_payload_envelope, extract_payload_id, validate_payload_envelope
 from convergence.chp.registry import DecisionRegistry
 from convergence.chp.validators import apply_third_party_validation
+from convergence.audit.ledger import AuditLedger
 from convergence.mesh.context import ContextEngine
+from convergence.mesh.rubric import assert_promotable
 
 
 @dataclass
@@ -81,9 +84,13 @@ class CHPOrchestrator:
         *,
         registry: Optional[DecisionRegistry] = None,
         context: Optional[ContextEngine] = None,
+        ledger: Optional[AuditLedger] = None,
     ) -> None:
         self.registry = registry or DecisionRegistry()
         self.context = context or ContextEngine()
+        # Row 35 enforcement: when a signed ledger is wired, narrative-rubric
+        # verdicts gate lock promotion exactly as the CHP state machine does.
+        self.ledger = ledger
 
     def run_initial_session(
         self,
@@ -164,14 +171,19 @@ class CHPOrchestrator:
         case.status = SessionStatus(snapshot_status)
         return case
 
-    def apply_validation(self, decision_id: str, validation) -> DecisionCase:
+    def apply_validation(self, decision_id: str, validation, *, problem: Optional[str] = None) -> DecisionCase:
         case = self.registry.get(decision_id)
         if not case:
             raise KeyError(f"Unknown decision_id: {decision_id}")
+        # Pre-check BEFORE mutation: a CONFIRM here would set LOCKED — refuse
+        # it while a failing narrative-rubric verdict governs the problem, so
+        # LOCKED-with-failing-verdict cannot arise as a state.
+        if validation.result == ValidationResult.CONFIRM and self.ledger is not None:
+            assert_promotable(self.ledger.read_all(), problem or case.title)
         apply_third_party_validation(case, validation)
         return case
 
-    def advance_to_provisional_lock(self, decision_id: str) -> DecisionCase:
+    def advance_to_provisional_lock(self, decision_id: str, *, problem: Optional[str] = None) -> DecisionCase:
         case = self.registry.get(decision_id)
         if not case:
             raise KeyError(f"Unknown decision_id: {decision_id}")
@@ -179,6 +191,10 @@ class CHPOrchestrator:
             raise ValueError("Cannot advance a halted case")
         if case.status == SessionStatus.REFRAME_REQUIRED:
             raise ValueError("Case requires reframing before advancement")
+        if self.ledger is not None:
+            # The narrative's problem statement is the join key — by
+            # convention, orchestrate() is called with the case title.
+            assert_promotable(self.ledger.read_all(), problem or case.title)
         case.status = SessionStatus.PROVISIONAL_LOCK
         return case
 

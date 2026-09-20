@@ -223,7 +223,7 @@ class EnterpriseOrchestrator:
         result = evaluate_narrative(statement=workflow.statement, turns=turns)
         self.ledger.append(
             event="narrative_rubric", actor="narrative_rubric",
-            inputs={"problem": problem,
+            inputs={"problem": problem, "status": result.status, "score": result.score,
                     "criteria": {f.criterion: f.passed for f in result.findings}},
             sources=[t.agent for t in turns], confidence=None,
             rationale=f"score={result.score} status={result.status} — {result.rationale()}",

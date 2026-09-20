@@ -9,6 +9,7 @@ and re-graded CLEAR.
 
 from __future__ import annotations
 
+import logging
 import tempfile
 import unittest
 
@@ -127,6 +128,46 @@ class TestRubricBlocksPromotion(unittest.TestCase):
         ]
         clearance = clearance_for_problem(records, "Analyze CoA mapping")
         self.assertTrue(clearance.enforced)
+
+    def test_join_mismatch_logs_loud_audit_warning(self):
+        # A narrative_rubric verdict exists for a DIFFERENT problem string —
+        # promotion finds no join and the gate silently opens. That shape is
+        # the rename/mismatch audit risk: LOUD, but not a block.
+        records = [_verdict_record("Some other problem entirely", status="CLEAR",
+                                   score=100, ts="2026-09-20T10:00:00Z")]
+        orch = _wired_orchestrator(records)
+        with self.assertLogs("convergence.chp", level="WARNING") as captured:
+            case = orch.advance_to_provisional_lock("D-01")
+        self.assertEqual(case.status, SessionStatus.PROVISIONAL_LOCK)  # audit signal, not a block
+        self.assertTrue(any("AUDIT RISK" in line for line in captured.output),
+                        "mismatch promotion must be loud")
+
+    def test_genuine_chp_only_flow_stays_silent(self):
+        # No verdicts anywhere in the ledger: no ceremony, no noise. Ledger
+        # IS wired here (a FakeLedger), so construction is silent too.
+        orch = _wired_orchestrator([])
+        logger = logging.getLogger("convergence.chp")
+        records_seen: list[logging.LogRecord] = []
+        handler = logging.Handler()
+        handler.emit = records_seen.append
+        logger.addHandler(handler)
+        try:
+            case = orch.advance_to_provisional_lock("D-01")
+        finally:
+            logger.removeHandler(handler)
+        self.assertEqual(case.status, SessionStatus.PROVISIONAL_LOCK)
+        audit_logs = [r for r in records_seen if "AUDIT RISK" in r.getMessage()]
+        self.assertEqual(audit_logs, [], "genuine CHP-only promotion must stay silent")
+
+    def test_missing_ledger_logs_enforcement_disabled_warning(self):
+        # Silent-ungoverned production is the failure mode: construction
+        # without a ledger is loud.
+        registry = DecisionRegistry()
+        registry.add(_case())
+        with self.assertLogs("convergence.chp", level="WARNING") as captured:
+            CHPOrchestrator(registry=registry, ledger=None)
+        self.assertTrue(any("WITHOUT a signed AuditLedger" in line for line in captured.output),
+                        "missing-ledger construction must be loud")
 
 
 class TestClearanceScanning(unittest.TestCase):

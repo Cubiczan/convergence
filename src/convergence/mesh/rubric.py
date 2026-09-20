@@ -183,11 +183,20 @@ def evaluate_narrative(*, statement, turns: List[TurnResult]) -> RubricResult:
 
 @dataclass
 class RubricClearance:
-    """The governing rubric state for one problem, as scanned from the ledger."""
+    """The governing rubric state for one problem, as scanned from the ledger.
+
+    verdicts_total counts narrative_rubric events across ALL problems. A
+    clearance with status=None and verdicts_total>0 is the rename/mismatch
+    audit-risk shape: narratives are being graded, but none matches this
+    problem's join key — either a genuine CHP-only flow (verdicts_total=0,
+    silent) or a silent governance bypass after a case rename (loud warning
+    at the orchestrator call site).
+    """
 
     enforced: bool
     status: str | None
     reason: str
+    verdicts_total: int = 0
 
     @property
     def promotable(self) -> bool:
@@ -207,14 +216,21 @@ def clearance_for_problem(records: list, problem: str) -> RubricClearance:
     verdicts = [
         r for r in records
         if r.get("event") == "narrative_rubric"
-        and r.get("inputs", {}).get("problem") == problem
     ]
-    if not verdicts:
+    verdicts_total = len(verdicts)
+    matching = [
+        r for r in verdicts
+        if r.get("inputs", {}).get("problem") == problem
+    ]
+    if not matching:
         # No narrative was graded for this problem: the rubric enforces
-        # nothing here (CHP-only flows run without ceremony).
+        # nothing here. verdicts_total>0 distinguishes a genuine CHP-only
+        # flow (0 — no ceremony) from a rename/mismatch (n>0 — audit risk,
+        # surfaced loudly by the orchestrator).
         return RubricClearance(enforced=False, status=None,
-                               reason="no narrative_rubric verdict recorded for this problem")
-    latest = verdicts[-1]
+                               reason="no narrative_rubric verdict recorded for this problem",
+                               verdicts_total=verdicts_total)
+    latest = matching[-1]
     status = latest.get("inputs", {}).get("status")
     if status == "CLEAR":
         return RubricClearance(enforced=False, status="CLEAR",

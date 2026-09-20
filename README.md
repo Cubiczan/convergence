@@ -286,11 +286,10 @@ cognitive-mesh-orchestrator 0.1.0 | [Protocol Docs](https://codeberg.org/cubicza
 Decisions from the portfolio propagation matrix (SecOps/Gov wave C), recorded
 per the adopt-or-reverse contract. Revisit triggers are binding.
 
-### Row 35 — rubric chain: REVERSED
+### Row 35 — rubric chain: ADOPTED (corrected from a false-premise reversal)
 
-the repo emits machine-consumed coordination signals through the stigmergy board and mesh orchestrator (src/convergence/stigmergy/board.py, src/convergence/mesh/orchestrator.py); its deliverables are typed signals with deterministic dispositions, not graded prose — there is no artifact a rubric would score.
+**Correction (wave-C audit):** the original reversal claimed "there is no artifact a rubric would score." That was factually wrong. The Cognitive Mesh Protocol produces exactly the gradable surface the row targets: every agent turn emits a `ReasoningTrace` with expansion/compression steps, confidence (`ConfidenceLevel`), and grounding checks (`GroundingCheck.claim/source/confidence/risk_flag`), and the orchestrator synthesizes a board narrative (`board_narrative` event in the signed audit ledger, `src/convergence/mesh/orchestrator.py` `_synthesize_statement` / `_audit_workflow`).
 
-**Revisit trigger:** a genuinely subjective quality dimension appears in this
-repo's output that no deterministic gate can decide (e.g. prose quality in
-user-facing deliverables). Then author the rubric against the canonical
-chain shape rather than a local one.
+**Adoption:** `src/convergence/mesh/rubric.py` grades that narrative with four named, deterministic criteria — `root_cause_named` (30), `why_links_resolved` (30), `grounding_sourced` (25), `high_confidence_contribution` (15). It flags what the synthesizer would otherwise hide: placeholder-padded why-chains (the `_synthesize_statement` fallback pads to three links with `PADDING_WHY_ANSWER` — a narrative resting on padding no longer reads as clean), unsourced grounding claims, and narratives with no high-confidence contribution. Score 100 → `CLEAR`; anything less → `REQUIRES_HUMAN_VERIFICATION`. The verdict is appended to the same signed ledger as the narrative itself (`narrative_rubric` event), so the grade and the artifact are tamper-evident together.
+
+**Revisit trigger:** if a fifth subjective criterion is needed (prose quality in user-facing deliverables), add it to `CRITERION_WEIGHTS` keeping the sum at 100 rather than forking a local chain shape.

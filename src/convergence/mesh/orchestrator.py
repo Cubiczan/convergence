@@ -9,6 +9,7 @@ from convergence.audit.ledger import AuditLedger
 from convergence.mesh.agent import MeshAgent, TurnResult
 from convergence.mesh.bridge import BridgeFramework, Consequences, EntryPoint, Workflow, WhyLink
 from convergence.mesh.context import ContextEngine
+from convergence.mesh.rubric import PADDING_WHY_ANSWER, evaluate_narrative
 from convergence.stigmergy.board import SignalType, StigmergyBoard
 
 
@@ -213,6 +214,20 @@ class EnterpriseOrchestrator:
             rationale=(workflow.statement.root_cause
                        if getattr(workflow, "statement", None) else workflow.title),
         )
+        self._audit_narrative_rubric(problem=problem, workflow=workflow, turns=turns)
+
+    def _audit_narrative_rubric(self, *, problem: str, workflow: Workflow,
+                                turns: List[TurnResult]) -> None:
+        """Row 35 rubric chain: score the synthesized narrative and record
+        the verdict in the same signed ledger as the narrative itself."""
+        result = evaluate_narrative(statement=workflow.statement, turns=turns)
+        self.ledger.append(
+            event="narrative_rubric", actor="narrative_rubric",
+            inputs={"problem": problem,
+                    "criteria": {f.criterion: f.passed for f in result.findings}},
+            sources=[t.agent for t in turns], confidence=None,
+            rationale=f"score={result.score} status={result.status} — {result.rationale()}",
+        )
 
     def _synthesize_statement(self, *, problem: str, entry_point: EntryPoint, turns: List[TurnResult]):
         observable = (f"Today: {problem} - {len(turns)} specialist agent(s) produced recommendations "
@@ -226,7 +241,7 @@ class EnterpriseOrchestrator:
                                 answer=f"{first.label}: {first.content}"))
         while len(whys) < 3:
             whys.append(WhyLink(question="Why is this still unresolved?",
-                                answer="Because the binding constraint has not been named in shared context."))
+                                answer=PADDING_WHY_ANSWER))
         hi_conf = sorted(turns, key=lambda t: {"high": 3, "medium": 2, "low": 1}[t.trace.confidence.value],
                          reverse=True)
         financial = hi_conf[0].trace.recommendation if hi_conf else "Impact not yet quantified."
